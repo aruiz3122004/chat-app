@@ -19,17 +19,10 @@ export default function Chat({ session }: Props) {
   const [username, setUsername] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  // ✅ Inicializar como true (móvil) y corregir en useEffect
-  const [isMobile, setIsMobile] = useState(true)
 
   useEffect(() => {
-    // ✅ Calcular isMobile DESPUÉS de que el DOM esté listo
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
-    checkMobile()
     if (Notification.permission === 'default') Notification.requestPermission()
     fetchProfile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   const fetchProfile = async () => {
@@ -58,13 +51,14 @@ export default function Chat({ session }: Props) {
       padding: '20px 12px',
       background: '#0a0e17'
     }}>
-      <button style={{
-        padding: '8px', marginBottom: '16px',
-        textAlign: 'left', width: '100%',
-        borderRadius: '12px', background: 'transparent',
-        border: 'none', cursor: 'pointer'
-      }}
+      {/* Perfil */}
+      <button
         onClick={() => { setShowEditProfile(true); setSidebarOpen(false) }}
+        style={{
+          padding: '8px', marginBottom: '16px', textAlign: 'left',
+          width: '100%', borderRadius: '12px', background: 'transparent',
+          border: 'none', cursor: 'pointer'
+        }}
         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -75,30 +69,31 @@ export default function Chat({ session }: Props) {
             }} />
           ) : (
             <div style={{
-              width: '28px', height: '28px', borderRadius: '8px',
+              width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
+              fontSize: '12px', fontWeight: 'bold',
               background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white'
             }}>
               {username[0]?.toUpperCase()}
             </div>
           )}
-          <h1 style={{
+          <span style={{
             color: 'white', fontWeight: 'bold', fontSize: '14px',
             fontFamily: 'Syne, sans-serif', overflow: 'hidden',
-            textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>
             {username || 'ChatApp'}
-          </h1>
+          </span>
         </div>
         <p style={{
-          fontSize: '12px', color: '#334155', paddingLeft: '36px',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0
+          fontSize: '12px', color: '#334155', paddingLeft: '36px', margin: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }}>
           {session.user.email}
         </p>
       </button>
 
+      {/* Búsqueda */}
       <div style={{ marginBottom: '16px' }}>
         <UserSearch
           currentUserId={session.user.id}
@@ -108,6 +103,7 @@ export default function Chat({ session }: Props) {
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
 
+      {/* Grupos */}
       <div style={{ marginBottom: '16px' }}>
         <GroupList
           userId={session.user.id}
@@ -118,6 +114,7 @@ export default function Chat({ session }: Props) {
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
 
+      {/* Usuarios */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <UserList
           currentUserId={session.user.id}
@@ -126,14 +123,15 @@ export default function Chat({ session }: Props) {
         />
       </div>
 
+      {/* Cerrar sesión */}
       <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <button
           onClick={handleLogout}
           style={{
             width: '100%', padding: '8px 12px', borderRadius: '12px',
-            fontSize: '12px', fontWeight: '500', border: 'none',
-            cursor: 'pointer', display: 'flex', alignItems: 'center',
-            gap: '8px', color: '#475569', background: 'transparent'
+            fontSize: '12px', fontWeight: '500', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            color: '#475569', background: 'transparent'
           }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'
@@ -151,7 +149,8 @@ export default function Chat({ session }: Props) {
 
   return (
     <div style={{
-      display: 'flex', height: '100vh', width: '100vw',
+      display: 'flex', flexDirection: 'column',
+      height: '100vh', width: '100vw',
       overflow: 'hidden', background: '#080b12'
     }}>
 
@@ -165,23 +164,9 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* SIDEBAR DESKTOP — solo en pantallas grandes */}
-      {!isMobile && (
-        <div style={{
-          width: '240px', flexShrink: 0,
-          borderRight: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', flexDirection: 'column'
-        }}>
-          <SidebarContent />
-        </div>
-      )}
-
-      {/* SIDEBAR MÓVIL — overlay sobre todo */}
-      {isMobile && sidebarOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          display: 'flex'
-        }}>
+      {/* SIDEBAR — siempre overlay en todos los dispositivos */}
+      {sidebarOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex' }}>
           <div
             style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)' }}
             onClick={() => setSidebarOpen(false)}
@@ -197,124 +182,110 @@ export default function Chat({ session }: Props) {
         </div>
       )}
 
-      {/* ÁREA PRINCIPAL — siempre visible */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* Barra superior móvil */}
-        {isMobile && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '12px',
-            padding: '12px 16px', flexShrink: 0,
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            background: '#0a0e17'
-          }}>
-            {activeView ? (
-              <button
-                onClick={() => setActiveView(null)}
-                style={{
-                  width: '32px', height: '32px', borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, border: 'none', cursor: 'pointer',
-                  background: 'rgba(99,102,241,0.15)', color: '#818cf8',
-                  fontSize: '16px'
-                }}>
-                ←
-              </button>
-            ) : (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                style={{
-                  width: '32px', height: '32px', borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, border: 'none', cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.05)', color: '#64748b',
-                  fontSize: '16px'
-                }}>
-                ☰
-              </button>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-              <div style={{
-                width: '24px', height: '24px', borderRadius: '6px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '12px', flexShrink: 0,
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-              }}>
-                💬
-              </div>
-              <span style={{
-                color: 'white', fontSize: '14px', fontWeight: 'bold',
-                fontFamily: 'Syne, sans-serif',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-              }}>
-                {activeView?.type === 'group'
-                  ? `# ${activeView.data.name}`
-                  : activeView?.type === 'direct'
-                  ? activeView.data.username
-                  : 'ChatApp'}
-              </span>
-            </div>
-
-            {activeView && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                style={{
-                  width: '32px', height: '32px', borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, border: 'none', cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.05)', color: '#64748b',
-                  fontSize: '16px'
-                }}>
-                ☰
-              </button>
-            )}
-          </div>
+      {/* BARRA SUPERIOR — siempre visible en todos los dispositivos */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '12px',
+        padding: '12px 16px', flexShrink: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        background: '#0a0e17'
+      }}>
+        {activeView ? (
+          <button
+            onClick={() => setActiveView(null)}
+            style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              border: 'none', cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontSize: '16px'
+            }}>
+            ←
+          </button>
+        ) : (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              border: 'none', cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '16px'
+            }}>
+            ☰
+          </button>
         )}
 
-        {/* Contenido */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          {activeView?.type === 'group' && (
-            <ChatWindow
-              groupId={activeView.data.id}
-              groupName={activeView.data.name}
-              currentUserId={session.user.id}
-            />
-          )}
-          {activeView?.type === 'direct' && (
-            <DirectChatWindow
-              currentUserId={session.user.id}
-              targetUser={activeView.data}
-            />
-          )}
-          {!activeView && (
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              height: '100%'
-            }}>
-              <div style={{ fontSize: '60px', marginBottom: '16px', opacity: 0.1 }}>💬</div>
-              <p style={{
-                fontSize: '16px', fontWeight: '600', textAlign: 'center',
-                padding: '0 16px', fontFamily: 'Syne, sans-serif', color: '#1e293b'
-              }}>
-                Selecciona un canal o usuario
-              </p>
-              {isMobile && (
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  style={{
-                    marginTop: '16px', padding: '12px 24px',
-                    borderRadius: '12px', fontSize: '14px', fontWeight: '500',
-                    border: 'none', cursor: 'pointer',
-                    background: 'rgba(99,102,241,0.15)', color: '#818cf8'
-                  }}>
-                  Ver canales y usuarios
-                </button>
-              )}
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+          <div style={{
+            width: '24px', height: '24px', borderRadius: '6px', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px',
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+          }}>
+            💬
+          </div>
+          <span style={{
+            color: 'white', fontSize: '14px', fontWeight: 'bold',
+            fontFamily: 'Syne, sans-serif',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }}>
+            {activeView?.type === 'group'
+              ? `# ${activeView.data.name}`
+              : activeView?.type === 'direct'
+              ? activeView.data.username
+              : 'ChatApp'}
+          </span>
         </div>
+
+        {activeView && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              border: 'none', cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '16px'
+            }}>
+            ☰
+          </button>
+        )}
+      </div>
+
+      {/* CONTENIDO PRINCIPAL */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {activeView?.type === 'group' && (
+          <ChatWindow
+            groupId={activeView.data.id}
+            groupName={activeView.data.name}
+            currentUserId={session.user.id}
+          />
+        )}
+        {activeView?.type === 'direct' && (
+          <DirectChatWindow
+            currentUserId={session.user.id}
+            targetUser={activeView.data}
+          />
+        )}
+        {!activeView && (
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', height: '100%'
+          }}>
+            <div style={{ fontSize: '60px', marginBottom: '16px', opacity: 0.1 }}>💬</div>
+            <p style={{
+              fontSize: '16px', fontWeight: '600', textAlign: 'center',
+              padding: '0 16px', fontFamily: 'Syne, sans-serif', color: '#1e293b'
+            }}>
+              Selecciona un canal o usuario
+            </p>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                marginTop: '16px', padding: '12px 24px', borderRadius: '12px',
+                fontSize: '14px', fontWeight: '500', border: 'none', cursor: 'pointer',
+                background: 'rgba(99,102,241,0.15)', color: '#818cf8'
+              }}>
+              Ver canales y usuarios
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
