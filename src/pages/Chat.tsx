@@ -19,14 +19,17 @@ export default function Chat({ session }: Props) {
   const [username, setUsername] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
+  // ✅ Inicializar como true (móvil) y corregir en useEffect
+  const [isMobile, setIsMobile] = useState(true)
 
   useEffect(() => {
+    // ✅ Calcular isMobile DESPUÉS de que el DOM esté listo
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    checkMobile()
     if (Notification.permission === 'default') Notification.requestPermission()
     fetchProfile()
-    const handleResize = () => setIsMobile(window.innerWidth < 1024)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   const fetchProfile = async () => {
@@ -49,31 +52,54 @@ export default function Chat({ session }: Props) {
   }
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full w-full py-5 px-3"
-      style={{ background: '#0a0e17' }}>
-      <button className="px-2 mb-4 text-left w-full rounded-xl p-2 transition-all"
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: '100%', width: '100%',
+      padding: '20px 12px',
+      background: '#0a0e17'
+    }}>
+      <button style={{
+        padding: '8px', marginBottom: '16px',
+        textAlign: 'left', width: '100%',
+        borderRadius: '12px', background: 'transparent',
+        border: 'none', cursor: 'pointer'
+      }}
         onClick={() => { setShowEditProfile(true); setSidebarOpen(false) }}
         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
-        <div className="flex items-center gap-2 mb-1">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           {avatar ? (
-            <img src={avatar} alt="avatar" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+            <img src={avatar} alt="avatar" style={{
+              width: '28px', height: '28px', borderRadius: '8px',
+              objectFit: 'cover', flexShrink: 0
+            }} />
           ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white' }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '12px', fontWeight: 'bold', flexShrink: 0,
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white'
+            }}>
               {username[0]?.toUpperCase()}
             </div>
           )}
-          <h1 className="text-white font-bold text-sm truncate" style={{ fontFamily: 'Syne, sans-serif' }}>
+          <h1 style={{
+            color: 'white', fontWeight: 'bold', fontSize: '14px',
+            fontFamily: 'Syne, sans-serif', overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0
+          }}>
             {username || 'ChatApp'}
           </h1>
         </div>
-        <p className="text-xs truncate pl-9" style={{ color: '#334155' }}>
+        <p style={{
+          fontSize: '12px', color: '#334155', paddingLeft: '36px',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0
+        }}>
           {session.user.email}
         </p>
       </button>
 
-      <div className="mb-4">
+      <div style={{ marginBottom: '16px' }}>
         <UserSearch
           currentUserId={session.user.id}
           onStartChat={u => handleSelectView({ type: 'direct', data: u })}
@@ -82,7 +108,7 @@ export default function Chat({ session }: Props) {
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
 
-      <div className="mb-4">
+      <div style={{ marginBottom: '16px' }}>
         <GroupList
           userId={session.user.id}
           onSelectGroup={g => handleSelectView({ type: 'group', data: g })}
@@ -92,7 +118,7 @@ export default function Chat({ session }: Props) {
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
 
-      <div className="flex-1 overflow-y-auto">
+      <div style={{ flex: 1, overflowY: 'auto' }}>
         <UserList
           currentUserId={session.user.id}
           onSelectUser={u => handleSelectView({ type: 'direct', data: u })}
@@ -100,10 +126,15 @@ export default function Chat({ session }: Props) {
         />
       </div>
 
-      <div className="pt-4 px-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <button onClick={handleLogout}
-          className="w-full py-2 px-3 rounded-xl text-xs font-medium transition-all flex items-center gap-2"
-          style={{ color: '#475569' }}
+      <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: '12px',
+            fontSize: '12px', fontWeight: '500', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center',
+            gap: '8px', color: '#475569', background: 'transparent'
+          }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'
             ;(e.currentTarget as HTMLElement).style.color = '#fca5a5'
@@ -119,7 +150,10 @@ export default function Chat({ session }: Props) {
   )
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden" style={{ background: '#080b12' }}>
+    <div style={{
+      display: 'flex', height: '100vh', width: '100vw',
+      overflow: 'hidden', background: '#080b12'
+    }}>
 
       {showEditProfile && (
         <EditProfile
@@ -131,55 +165,89 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* SIDEBAR DESKTOP — siempre fijo a la izquierda */}
+      {/* SIDEBAR DESKTOP — solo en pantallas grandes */}
       {!isMobile && (
-        <div className="flex flex-col flex-shrink-0"
-          style={{ width: '240px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{
+          width: '240px', flexShrink: 0,
+          borderRight: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', flexDirection: 'column'
+        }}>
           <SidebarContent />
         </div>
       )}
 
-      {/* SIDEBAR MÓVIL — siempre overlay, nunca reemplaza la pantalla */}
+      {/* SIDEBAR MÓVIL — overlay sobre todo */}
       {isMobile && sidebarOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)' }}
-            onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 flex flex-col h-full"
-            style={{ width: '280px', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          display: 'flex'
+        }}>
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div style={{
+            position: 'relative', zIndex: 10000,
+            width: '280px', height: '100%',
+            display: 'flex', flexDirection: 'column',
+            borderRight: '1px solid rgba(255,255,255,0.08)'
+          }}>
             <SidebarContent />
           </div>
         </div>
       )}
 
       {/* ÁREA PRINCIPAL — siempre visible */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Barra superior móvil — siempre visible en móvil */}
+        {/* Barra superior móvil */}
         {isMobile && (
-          <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0a0e17' }}>
-
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            padding: '12px 16px', flexShrink: 0,
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            background: '#0a0e17'
+          }}>
             {activeView ? (
-              <button onClick={() => setActiveView(null)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+              <button
+                onClick={() => setActiveView(null)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, border: 'none', cursor: 'pointer',
+                  background: 'rgba(99,102,241,0.15)', color: '#818cf8',
+                  fontSize: '16px'
+                }}>
                 ←
               </button>
             ) : (
-              <button onClick={() => setSidebarOpen(true)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b' }}>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, border: 'none', cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.05)', color: '#64748b',
+                  fontSize: '16px'
+                }}>
                 ☰
               </button>
             )}
 
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+              <div style={{
+                width: '24px', height: '24px', borderRadius: '6px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', flexShrink: 0,
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+              }}>
                 💬
               </div>
-              <span className="text-white text-sm font-bold truncate"
-                style={{ fontFamily: 'Syne, sans-serif' }}>
+              <span style={{
+                color: 'white', fontSize: '14px', fontWeight: 'bold',
+                fontFamily: 'Syne, sans-serif',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>
                 {activeView?.type === 'group'
                   ? `# ${activeView.data.name}`
                   : activeView?.type === 'direct'
@@ -189,17 +257,23 @@ export default function Chat({ session }: Props) {
             </div>
 
             {activeView && (
-              <button onClick={() => setSidebarOpen(true)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b' }}>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, border: 'none', cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.05)', color: '#64748b',
+                  fontSize: '16px'
+                }}>
                 ☰
               </button>
             )}
           </div>
         )}
 
-        {/* Contenido principal */}
-        <div className="flex-1 overflow-hidden">
+        {/* Contenido */}
+        <div style={{ flex: 1, overflow: 'hidden' }}>
           {activeView?.type === 'group' && (
             <ChatWindow
               groupId={activeView.data.id}
@@ -214,17 +288,27 @@ export default function Chat({ session }: Props) {
             />
           )}
           {!activeView && (
-            <div className="flex flex-col items-center justify-center h-full animate-fade-in">
-              <div className="text-6xl mb-4 opacity-10">💬</div>
-              <p className="text-base font-semibold px-4 text-center"
-                style={{ fontFamily: 'Syne, sans-serif', color: '#1e293b' }}>
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              height: '100%'
+            }}>
+              <div style={{ fontSize: '60px', marginBottom: '16px', opacity: 0.1 }}>💬</div>
+              <p style={{
+                fontSize: '16px', fontWeight: '600', textAlign: 'center',
+                padding: '0 16px', fontFamily: 'Syne, sans-serif', color: '#1e293b'
+              }}>
                 Selecciona un canal o usuario
               </p>
               {isMobile && (
                 <button
-                  className="mt-4 px-6 py-3 rounded-xl text-sm font-medium"
-                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
-                  onClick={() => setSidebarOpen(true)}>
+                  onClick={() => setSidebarOpen(true)}
+                  style={{
+                    marginTop: '16px', padding: '12px 24px',
+                    borderRadius: '12px', fontSize: '14px', fontWeight: '500',
+                    border: 'none', cursor: 'pointer',
+                    background: 'rgba(99,102,241,0.15)', color: '#818cf8'
+                  }}>
                   Ver canales y usuarios
                 </button>
               )}
