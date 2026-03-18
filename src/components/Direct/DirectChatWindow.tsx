@@ -2,12 +2,14 @@ import { useEffect, useState, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { encryptMessage, decryptMessage } from '../../lib/crypto'
+import MessageStatus from '../Chat/MessageStatus'
 
 interface Message {
   id: string
   content: string
   sender_id: string
   created_at: string
+  status: 'sent' | 'delivered' | 'read'
 }
 
 interface Profile { id: string; username: string }
@@ -37,7 +39,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         event: 'INSERT',
         schema: 'public',
         table: 'direct_messages'
-      }, payload => {
+      }, async payload => {
         const msg = payload.new as any
         const isRelevant =
           (msg.sender_id === currentUserId && msg.receiver_id === targetUser.id) ||
@@ -47,12 +49,25 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
             if (prev.find(m => m.id === msg.id)) return prev
             return [...prev, msg]
           })
-          if (msg.sender_id !== currentUserId) {
+          // Si el mensaje es para mí, marcarlo como leído
+          if (msg.sender_id === targetUser.id) {
+            await markAsRead(msg.id)
+          } else {
             toast(`${targetUser.username}: ${decryptMessage(msg.content).slice(0, 50)}`, {
               icon: '💬', duration: 3000
             })
           }
         }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'direct_messages'
+      }, payload => {
+        const updated = payload.new as Message
+        setMessages(prev =>
+          prev.map(m => m.id === updated.id ? { ...m, status: updated.status } : m)
+        )
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -61,6 +76,27 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Marcar todos los mensajes recibidos como leídos al abrir el chat
+  useEffect(() => {
+    markAllAsRead()
+  }, [targetUser.id])
+
+  const markAsRead = async (messageId: string) => {
+    await supabase
+      .from('direct_messages')
+      .update({ status: 'read' })
+      .eq('id', messageId)
+  }
+
+  const markAllAsRead = async () => {
+    await supabase
+      .from('direct_messages')
+      .update({ status: 'read' })
+      .eq('sender_id', targetUser.id)
+      .eq('receiver_id', currentUserId)
+      .neq('status', 'read')
+  }
 
   const fetchMessages = async () => {
     const { data } = await supabase
@@ -72,6 +108,8 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       )
       .order('created_at', { ascending: true })
     if (data) setMessages(data)
+    // Marcar como leídos al cargar
+    await markAllAsRead()
   }
 
   const sendMessage = async () => {
@@ -81,7 +119,8 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       content: encryptMessage(text),
       sender_id: currentUserId,
       receiver_id: targetUser.id,
-      is_encrypted: true
+      is_encrypted: true,
+      status: 'sent'
     })
     setText('')
     setSending(false)
@@ -93,11 +132,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
-
-      mediaRecorder.ondataavailable = e => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       mediaRecorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         const fileName = `audio_${Date.now()}.webm`
@@ -105,25 +140,22 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         const { data, error } = await supabase.storage
           .from('chat-files').upload(`direct/${fileName}`, file)
         if (!error && data) {
-          const { data: urlData } = supabase.storage
-            .from('chat-files').getPublicUrl(data.path)
+          const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(data.path)
           await supabase.from('direct_messages').insert({
             content: encryptMessage(`AUDIO:${fileName}:${urlData.publicUrl}`),
             sender_id: currentUserId,
             receiver_id: targetUser.id,
-            is_encrypted: true
+            is_encrypted: true,
+            status: 'sent'
           })
         }
         stream.getTracks().forEach(t => t.stop())
       }
-
       mediaRecorder.start()
       setRecording(true)
       setRecordingTime(0)
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000)
-    } catch {
-      alert('No se pudo acceder al micrófono')
-    }
+    } catch { alert('No se pudo acceder al micrófono') }
   }
 
   const stopRecording = () => {
@@ -148,6 +180,25 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
             <source src={fileUrl} type="audio/webm" />
           </audio>
         </div>
+      )
+    }
+    if (t.startsWith('FILE:')) {
+      const parts = t.split(':')
+      const fileName = parts[1]
+      const fileUrl = parts.slice(2).join(':')
+      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
+      return isImage ? (
+        <div>
+          <img src={fileUrl} alt={fileName}
+            className="max-w-xs rounded-lg cursor-pointer"
+            onClick={() => window.open(fileUrl, '_blank')} />
+          <p className="text-xs mt-1 opacity-70">{fileName}</p>
+        </div>
+      ) : (
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 underline">
+          📄 {fileName}
+        </a>
       )
     }
     return <p>{t}</p>
@@ -191,9 +242,12 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
                   }}>
                   {renderContent(msg.content)}
                 </div>
-                <span className="text-xs mt-1" style={{ color: '#334155' }}>
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs" style={{ color: '#334155' }}>
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <MessageStatus status={msg.status} isOwn={isOwn} />
+                </div>
               </div>
             </div>
           )
