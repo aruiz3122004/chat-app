@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 interface Profile {
   id: string
   username: string
+  avatar_url: string | null
 }
 
 interface Props {
@@ -19,12 +20,42 @@ export default function UserList({ currentUserId, onSelectUser, selectedUserId }
     const fetchUsers = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, username')
+        .select('id, username, avatar_url')
         .neq('id', currentUserId)
       if (data) setUsers(data)
     }
     fetchUsers()
+
+    // Suscribirse a cambios de perfiles en tiempo real
+    const channel = supabase
+      .channel('profiles_changes')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, payload => {
+        const updated = payload.new as Profile
+        setUsers(prev =>
+          prev.map(u => u.id === updated.id ? { ...u, ...updated } : u)
+        )
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
+
+  const Avatar = ({ user }: { user: Profile }) => (
+    user.avatar_url ? (
+      <img src={user.avatar_url} alt={user.username}
+        className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+        style={{ border: '1px solid rgba(99,102,241,0.3)' }} />
+    ) : (
+      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+        style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+        {user.username[0].toUpperCase()}
+      </div>
+    )
+  )
 
   return (
     <div>
@@ -49,10 +80,7 @@ export default function UserList({ currentUserId, onSelectUser, selectedUserId }
                 : '1px solid transparent'
             }}
           >
-            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-              {user.username[0].toUpperCase()}
-            </div>
+            <Avatar user={user} />
             {user.username}
           </button>
         ))}

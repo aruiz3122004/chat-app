@@ -12,7 +12,11 @@ interface Message {
   status: 'sent' | 'delivered' | 'read'
 }
 
-interface Profile { id: string; username: string }
+interface Profile {
+  id: string
+  username: string
+  avatar_url?: string | null
+}
 
 interface Props {
   currentUserId: string
@@ -25,6 +29,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
   const [sending, setSending] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
+  const [targetAvatar, setTargetAvatar] = useState<string | null>(targetUser.avatar_url ?? null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -49,7 +54,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
             if (prev.find(m => m.id === msg.id)) return prev
             return [...prev, msg]
           })
-          // Si el mensaje es para mí, marcarlo como leído
           if (msg.sender_id === targetUser.id) {
             await markAsRead(msg.id)
           } else {
@@ -69,6 +73,17 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
           prev.map(m => m.id === updated.id ? { ...m, status: updated.status } : m)
         )
       })
+      // Escuchar cambios de avatar del targetUser
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, payload => {
+        const updated = payload.new as any
+        if (updated.id === targetUser.id) {
+          setTargetAvatar(updated.avatar_url)
+        }
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [targetUser.id])
@@ -77,9 +92,18 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Marcar todos los mensajes recibidos como leídos al abrir el chat
   useEffect(() => {
     markAllAsRead()
+    // Cargar avatar actualizado del targetUser
+    const fetchTargetProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', targetUser.id)
+        .single()
+      if (data) setTargetAvatar(data.avatar_url)
+    }
+    fetchTargetProfile()
   }, [targetUser.id])
 
   const markAsRead = async (messageId: string) => {
@@ -108,7 +132,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       )
       .order('created_at', { ascending: true })
     if (data) setMessages(data)
-    // Marcar como leídos al cargar
     await markAllAsRead()
   }
 
@@ -210,10 +233,16 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       <div className="px-6 py-4 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080b12' }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-            style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-            {targetUser.username[0].toUpperCase()}
-          </div>
+          {targetAvatar ? (
+            <img src={targetAvatar} alt={targetUser.username}
+              className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+              style={{ border: '2px solid rgba(99,102,241,0.3)' }} />
+          ) : (
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+              {targetUser.username[0].toUpperCase()}
+            </div>
+          )}
           <div>
             <h2 className="text-white text-sm font-semibold" style={{ fontFamily: 'Syne, sans-serif' }}>
               {targetUser.username}
