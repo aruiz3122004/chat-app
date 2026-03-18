@@ -17,8 +17,17 @@ export default function GroupList({ userId, onSelectGroup, selectedGroupId }: Pr
   useEffect(() => { fetchGroups() }, [])
 
   const fetchGroups = async () => {
-    const { data } = await supabase.from('groups').select('*').order('created_at', { ascending: true })
-    if (data) setGroups(data)
+    const { data } = await supabase
+      .from('group_members')
+      .select('group_id, groups(id, name)')
+      .eq('user_id', userId)
+
+    if (data) {
+      const parsed = data
+        .map((row: any) => row.groups)
+        .filter(Boolean)
+      setGroups(parsed)
+    }
   }
 
   const createGroup = async () => {
@@ -38,7 +47,8 @@ export default function GroupList({ userId, onSelectGroup, selectedGroupId }: Pr
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-xs font-semibold tracking-widest" style={{ color: '#475569', fontFamily: 'Syne, sans-serif' }}>
+        <span className="text-xs font-semibold tracking-widest"
+          style={{ color: '#475569', fontFamily: 'Syne, sans-serif' }}>
           CANALES
         </span>
         <button
@@ -67,11 +77,18 @@ export default function GroupList({ userId, onSelectGroup, selectedGroupId }: Pr
               if (e.key === 'Escape') setShowInput(false)
             }}
           />
-          <p className="text-xs mt-1" style={{ color: '#475569' }}>Enter para crear · Esc para cancelar</p>
+          <p className="text-xs mt-1" style={{ color: '#475569' }}>
+            Enter para crear · Esc para cancelar
+          </p>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto space-y-1">
+        {groups.length === 0 && (
+          <p className="text-xs px-1" style={{ color: '#334155' }}>
+            Sin canales aún
+          </p>
+        )}
         {groups.map((group, i) => (
           <button
             key={group.id}

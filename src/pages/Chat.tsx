@@ -5,6 +5,7 @@ import GroupList from '../components/Groups/GroupList'
 import ChatWindow from '../components/Chat/ChatWindow'
 import UserList from '../components/Direct/UserList'
 import DirectChatWindow from '../components/Direct/DirectChatWindow'
+import UserSearch from '../components/Direct/UserSearch'
 
 interface Props { session: Session }
 interface Group { id: string; name: string }
@@ -28,7 +29,7 @@ export default function Chat({ session }: Props) {
         style={{ borderRight: '1px solid rgba(255,255,255,0.05)', background: '#0a0e17' }}>
 
         {/* Header */}
-        <div className="px-2 mb-6">
+        <div className="px-2 mb-4">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
@@ -43,8 +44,19 @@ export default function Chat({ session }: Props) {
           </p>
         </div>
 
+        {/* Búsqueda */}
+        <div className="mb-4">
+          <UserSearch
+            currentUserId={session.user.id}
+            onStartChat={u => setActiveView({ type: 'direct', data: u })}
+          />
+        </div>
+
+        {/* Divisor */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
+
         {/* Grupos */}
-        <div className="mb-6">
+        <div className="mb-4">
           <GroupList
             userId={session.user.id}
             onSelectGroup={g => setActiveView({ type: 'group', data: g })}
