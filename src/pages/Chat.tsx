@@ -128,14 +128,14 @@ export default function Chat({ session }: Props) {
       )}
 
       {/* SIDEBAR DESKTOP */}
-      <div className="hidden sm:flex flex-col w-60 flex-shrink-0"
+      <div className="hidden md:flex flex-col w-60 flex-shrink-0"
         style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}>
         <Sidebar />
       </div>
 
       {/* SIDEBAR MÓVIL */}
       {sidebarOpen && (
-        <div className="sm:hidden fixed inset-0 z-40 flex">
+        <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }}
             onClick={() => setSidebarOpen(false)} />
           <div className="relative w-72 h-full z-50 flex flex-col"
@@ -149,7 +149,7 @@ export default function Chat({ session }: Props) {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ✅ CAMBIO: Barra superior móvil con botón de regreso */}
-        <div className="sm:hidden flex items-center gap-3 px-4 py-3 flex-shrink-0"
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 flex-shrink-0"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0a0e17' }}>
 
           {activeView ? (
@@ -215,7 +215,7 @@ export default function Chat({ session }: Props) {
                 Selecciona un canal o usuario
               </p>
               <button
-                className="sm:hidden mt-4 px-6 py-3 rounded-xl text-sm font-medium"
+                className="md:hidden mt-4 px-6 py-3 rounded-xl text-sm font-medium"
                 style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
                 onClick={() => setSidebarOpen(true)}>
                 Ver canales y usuarios
