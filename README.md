@@ -1,5 +1,8 @@
 # React + TypeScript + Vite
 
+TO RUN: NPM RUN DEV
+TO RUN +HOSTS: NPM RUN DEV -- --HOST
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
