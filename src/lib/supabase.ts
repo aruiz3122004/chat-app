@@ -7,11 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   realtime: {
     params: {
       eventsPerSecond: 10
-    }
-  },
-  global: {
-    headers: {
-      'x-my-custom-header': 'chat-app'
-    }
+    },
+    reconnectAfterMs: (tries: number) => [1000, 2000, 5000, 10000][tries] ?? 10000
   }
 })

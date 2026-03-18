@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { decryptMessage } from '../../lib/crypto'
@@ -6,16 +6,23 @@ import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 
 interface Message {
-  id: string; content: string; sender_id: string
-  created_at: string; is_file?: boolean; profiles?: { username: string }
+  id: string
+  content: string
+  sender_id: string
+  created_at: string
+  is_file?: boolean
+  profiles?: { username: string }
 }
+
 interface Props { groupId: string; groupName: string; currentUserId: string }
 
 export default function ChatWindow({ groupId, groupName, currentUserId }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetchMessages()
+
     const channel = supabase.channel(`messages:${groupId}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
@@ -25,7 +32,10 @@ export default function ChatWindow({ groupId, groupName, currentUserId }: Props)
         const { data: profile } = await supabase
           .from('profiles').select('username').eq('id', newMsg.sender_id).single()
         const msgWithProfile = { ...newMsg, profiles: profile ?? { username: 'Usuario' } }
-        setMessages(prev => [...prev, msgWithProfile])
+        setMessages(prev => {
+          if (prev.find(m => m.id === msgWithProfile.id)) return prev
+          return [...prev, msgWithProfile]
+        })
         if (newMsg.sender_id !== currentUserId) {
           const text = decryptMessage(newMsg.content)
           toast(`${profile?.username ?? 'Usuario'}: ${text.slice(0, 50)}`, {
@@ -34,19 +44,58 @@ export default function ChatWindow({ groupId, groupName, currentUserId }: Props)
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    // Polling de respaldo cada 3 segundos
+    pollRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('*, profiles(username)')
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true })
+      if (data) {
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id))
+          const newMsgs = data.filter((m: Message) => !existingIds.has(m.id))
+          if (newMsgs.length === 0) return prev
+          return [...prev, ...newMsgs]
+        })
+      }
+    }, 3000)
+
+    // Reconectar al volver a la app
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.realtime.connect()
+        fetchMessages()
+      }
+    }
+    const handleOnline = () => {
+      supabase.realtime.connect()
+      fetchMessages()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      supabase.removeChannel(channel)
+      if (pollRef.current) clearInterval(pollRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('online', handleOnline)
+    }
   }, [groupId])
 
   const fetchMessages = async () => {
-    const { data } = await supabase.from('messages')
-      .select('*, profiles(username)').eq('group_id', groupId)
+    const { data } = await supabase
+      .from('messages')
+      .select('*, profiles(username)')
+      .eq('group_id', groupId)
       .order('created_at', { ascending: true })
     if (data) setMessages(data)
   }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="px-6 py-4 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080b12' }}>
         <div className="flex items-center gap-3">

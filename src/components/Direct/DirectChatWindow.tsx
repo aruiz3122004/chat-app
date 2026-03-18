@@ -34,9 +34,11 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetchMessages()
+
     const channelId = [currentUserId, targetUser.id].sort().join('_')
     const channel = supabase
       .channel(`direct_${channelId}`)
@@ -56,7 +58,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
           })
           if (msg.sender_id === targetUser.id) {
             await markAsRead(msg.id)
-          } else {
             toast(`${targetUser.username}: ${decryptMessage(msg.content).slice(0, 50)}`, {
               icon: '💬', duration: 3000
             })
@@ -73,19 +74,63 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
           prev.map(m => m.id === updated.id ? { ...m, status: updated.status } : m)
         )
       })
-      // Escuchar cambios de avatar del targetUser
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'profiles'
       }, payload => {
         const updated = payload.new as any
-        if (updated.id === targetUser.id) {
-          setTargetAvatar(updated.avatar_url)
-        }
+        if (updated.id === targetUser.id) setTargetAvatar(updated.avatar_url)
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    // Polling de respaldo cada 3 segundos
+    pollRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('direct_messages')
+        .select('*')
+        .or(
+          `and(sender_id.eq.${currentUserId},receiver_id.eq.${targetUser.id}),` +
+          `and(sender_id.eq.${targetUser.id},receiver_id.eq.${currentUserId})`
+        )
+        .order('created_at', { ascending: true })
+      if (data) {
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id))
+          const newMsgs = data.filter((m: Message) => !existingIds.has(m.id))
+          if (newMsgs.length === 0) return prev
+          newMsgs.forEach((msg: Message) => {
+            if (msg.sender_id === targetUser.id) {
+              toast(`${targetUser.username}: ${decryptMessage(msg.content).slice(0, 50)}`, {
+                icon: '💬', duration: 3000
+              })
+            }
+          })
+          return [...prev, ...newMsgs]
+        })
+      }
+    }, 3000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.realtime.connect()
+        fetchMessages()
+      }
+    }
+    const handleOnline = () => {
+      supabase.realtime.connect()
+      fetchMessages()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      supabase.removeChannel(channel)
+      if (pollRef.current) clearInterval(pollRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('online', handleOnline)
+    }
   }, [targetUser.id])
 
   useEffect(() => {
@@ -94,28 +139,20 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
 
   useEffect(() => {
     markAllAsRead()
-    // Cargar avatar actualizado del targetUser
     const fetchTargetProfile = async () => {
       const { data } = await supabase
-        .from('profiles')
-        .select('avatar_url')
-        .eq('id', targetUser.id)
-        .single()
+        .from('profiles').select('avatar_url').eq('id', targetUser.id).single()
       if (data) setTargetAvatar(data.avatar_url)
     }
     fetchTargetProfile()
   }, [targetUser.id])
 
   const markAsRead = async (messageId: string) => {
-    await supabase
-      .from('direct_messages')
-      .update({ status: 'read' })
-      .eq('id', messageId)
+    await supabase.from('direct_messages').update({ status: 'read' }).eq('id', messageId)
   }
 
   const markAllAsRead = async () => {
-    await supabase
-      .from('direct_messages')
+    await supabase.from('direct_messages')
       .update({ status: 'read' })
       .eq('sender_id', targetUser.id)
       .eq('receiver_id', currentUserId)
@@ -229,7 +266,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="px-6 py-4 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080b12' }}>
         <div className="flex items-center gap-3">
@@ -257,7 +293,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         </div>
       </div>
 
-      {/* Mensajes */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map(msg => {
           const isOwn = msg.sender_id === currentUserId
@@ -284,7 +319,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
           style={{
