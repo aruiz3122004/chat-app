@@ -19,13 +19,11 @@ export default function Chat({ session }: Props) {
   const [username, setUsername] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  // ✅ NUEVO: detectar si es móvil con JS en lugar de CSS
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   useEffect(() => {
     if (Notification.permission === 'default') Notification.requestPermission()
     fetchProfile()
-    // ✅ NUEVO: escuchar cambios de tamaño de pantalla
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -50,11 +48,11 @@ export default function Chat({ session }: Props) {
     setSidebarOpen(false)
   }
 
-  const Sidebar = () => (
+  const SidebarContent = () => (
     <div className="flex flex-col h-full w-full py-5 px-3"
       style={{ background: '#0a0e17' }}>
       <button className="px-2 mb-4 text-left w-full rounded-xl p-2 transition-all"
-        onClick={() => setShowEditProfile(true)}
+        onClick={() => { setShowEditProfile(true); setSidebarOpen(false) }}
         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
         <div className="flex items-center gap-2 mb-1">
@@ -133,96 +131,107 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* ✅ SIDEBAR: visible siempre en desktop, oculto en móvil cuando hay chat abierto */}
-      {(!isMobile || !activeView) && (
+      {/* SIDEBAR DESKTOP — siempre fijo a la izquierda */}
+      {!isMobile && (
         <div className="flex flex-col flex-shrink-0"
-          style={{
-            width: isMobile ? '100%' : '240px',
-            borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.05)'
-          }}>
-          <Sidebar />
+          style={{ width: '240px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+          <SidebarContent />
         </div>
       )}
 
-      {/* ✅ SIDEBAR MÓVIL OVERLAY — cuando se abre con el botón ☰ */}
-      {sidebarOpen && isMobile && (
-        <div className="fixed inset-0 z-40 flex">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }}
+      {/* SIDEBAR MÓVIL — siempre overlay, nunca reemplaza la pantalla */}
+      {isMobile && sidebarOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)' }}
             onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 flex flex-col"
-            style={{ width: '280px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-            <Sidebar />
+          <div className="relative z-50 flex flex-col h-full"
+            style={{ width: '280px', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+            <SidebarContent />
           </div>
         </div>
       )}
 
-      {/* ✅ ÁREA PRINCIPAL: solo visible cuando hay chat abierto en móvil, siempre en desktop */}
-      {(!isMobile || activeView) && (
-        <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ÁREA PRINCIPAL — siempre visible */}
+      <div className="flex-1 flex flex-col overflow-hidden">
 
-          {/* ✅ Barra superior — solo en móvil */}
-          {isMobile && (
-            <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0a0e17' }}>
+        {/* Barra superior móvil — siempre visible en móvil */}
+        {isMobile && (
+          <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0a0e17' }}>
 
-              {/* Botón ← para volver */}
+            {activeView ? (
               <button onClick={() => setActiveView(null)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
                 ←
               </button>
-
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                  💬
-                </div>
-                <span className="text-white text-sm font-bold truncate"
-                  style={{ fontFamily: 'Syne, sans-serif' }}>
-                  {activeView?.type === 'group'
-                    ? `# ${activeView.data.name}`
-                    : activeView?.type === 'direct'
-                    ? activeView.data.username
-                    : 'ChatApp'}
-                </span>
-              </div>
-
-              {/* Botón ☰ para abrir menú sin salir del chat */}
+            ) : (
               <button onClick={() => setSidebarOpen(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b' }}>
                 ☰
               </button>
-            </div>
-          )}
+            )}
 
-          {/* Contenido */}
-          <div className="flex-1 overflow-hidden">
-            {activeView?.type === 'group' && (
-              <ChatWindow
-                groupId={activeView.data.id}
-                groupName={activeView.data.name}
-                currentUserId={session.user.id}
-              />
-            )}
-            {activeView?.type === 'direct' && (
-              <DirectChatWindow
-                currentUserId={session.user.id}
-                targetUser={activeView.data}
-              />
-            )}
-            {!activeView && !isMobile && (
-              <div className="flex flex-col items-center justify-center h-full animate-fade-in">
-                <div className="text-6xl mb-4 opacity-10">💬</div>
-                <p className="text-base font-semibold px-4 text-center"
-                  style={{ fontFamily: 'Syne, sans-serif', color: '#1e293b' }}>
-                  Selecciona un canal o usuario
-                </p>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                💬
               </div>
+              <span className="text-white text-sm font-bold truncate"
+                style={{ fontFamily: 'Syne, sans-serif' }}>
+                {activeView?.type === 'group'
+                  ? `# ${activeView.data.name}`
+                  : activeView?.type === 'direct'
+                  ? activeView.data.username
+                  : 'ChatApp'}
+              </span>
+            </div>
+
+            {activeView && (
+              <button onClick={() => setSidebarOpen(true)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#64748b' }}>
+                ☰
+              </button>
             )}
           </div>
+        )}
+
+        {/* Contenido principal */}
+        <div className="flex-1 overflow-hidden">
+          {activeView?.type === 'group' && (
+            <ChatWindow
+              groupId={activeView.data.id}
+              groupName={activeView.data.name}
+              currentUserId={session.user.id}
+            />
+          )}
+          {activeView?.type === 'direct' && (
+            <DirectChatWindow
+              currentUserId={session.user.id}
+              targetUser={activeView.data}
+            />
+          )}
+          {!activeView && (
+            <div className="flex flex-col items-center justify-center h-full animate-fade-in">
+              <div className="text-6xl mb-4 opacity-10">💬</div>
+              <p className="text-base font-semibold px-4 text-center"
+                style={{ fontFamily: 'Syne, sans-serif', color: '#1e293b' }}>
+                Selecciona un canal o usuario
+              </p>
+              {isMobile && (
+                <button
+                  className="mt-4 px-6 py-3 rounded-xl text-sm font-medium"
+                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+                  onClick={() => setSidebarOpen(true)}>
+                  Ver canales y usuarios
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
