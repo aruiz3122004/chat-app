@@ -13,7 +13,6 @@ interface Group { id: string; name: string }
 interface Profile { id: string; username: string; avatar_url?: string | null }
 type ActiveView = { type: 'group'; data: Group } | { type: 'direct'; data: Profile } | null
 
-// ✅ Fuera del componente para evitar remonte
 interface SidebarProps {
   avatar: string | null
   username: string
@@ -160,7 +159,8 @@ export default function Chat({ session }: Props) {
   }
 
   const sidebarProps: SidebarProps = {
-    avatar, username,
+    avatar,
+    username,
     email: session.user.email ?? '',
     userId: session.user.id,
     activeView,
@@ -173,10 +173,13 @@ export default function Chat({ session }: Props) {
   }
 
   return (
-    <div
-      className="flex h-screen w-screen overflow-hidden"
-      style={{ background: '#080b12' }}
-    >
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      width: '100vw',
+      overflow: 'hidden',
+      background: '#080b12'
+    }}>
       {showEditProfile && (
         <EditProfile
           userId={session.user.id}
@@ -187,44 +190,34 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* ✅ SIDEBAR DESKTOP — visible en sm: (640px+), oculto en móvil */}
-      <div
-        className="hidden sm:flex flex-col flex-shrink-0"
-        style={{ width: '260px', borderRight: '1px solid rgba(255,255,255,0.05)' }}
-      >
+      {/* SIDEBAR DESKTOP — controlada por CSS puro en index.css */}
+      <div className="layout-sidebar">
         <SidebarContent {...sidebarProps} />
       </div>
 
-      {/* ✅ SIDEBAR MÓVIL — overlay, solo visible cuando sidebarOpen=true */}
+      {/* SIDEBAR OVERLAY — para móvil cuando se abre con ☰ */}
       {sidebarOpen && (
-        <div className="sm:hidden fixed inset-0 z-50 flex">
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex' }}>
           <div
-            className="absolute inset-0"
-            style={{ background: 'rgba(0,0,0,0.7)' }}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)' }}
             onClick={() => setSidebarOpen(false)}
           />
-          <div
-            className="relative flex flex-col h-full"
-            style={{ width: '280px', zIndex: 51, borderRight: '1px solid rgba(255,255,255,0.08)' }}
-          >
+          <div style={{
+            position: 'relative', zIndex: 10000,
+            width: '280px', height: '100%',
+            display: 'flex', flexDirection: 'column',
+            borderRight: '1px solid rgba(255,255,255,0.08)'
+          }}>
             <SidebarContent {...sidebarProps} />
           </div>
         </div>
       )}
 
       {/* ÁREA PRINCIPAL */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* ✅ BARRA SUPERIOR — solo visible en móvil (oculta en sm:) */}
-        <div
-          className="flex sm:hidden items-center gap-3 flex-shrink-0"
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            background: '#0a0e17'
-          }}
-        >
-          {/* ← Volver — solo cuando hay chat abierto */}
+        {/* BARRA SUPERIOR — controlada por CSS puro en index.css */}
+        <div className="layout-topbar">
           {activeView ? (
             <button
               onClick={() => setActiveView(null)}
@@ -232,35 +225,31 @@ export default function Chat({ session }: Props) {
                 width: '36px', height: '36px', borderRadius: '10px',
                 border: 'none', cursor: 'pointer', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(99,102,241,0.2)', color: '#818cf8', fontSize: '18px'
+                background: 'rgba(99,102,241,0.2)', color: '#818cf8', fontSize: '20px'
               }}>
               ←
             </button>
           ) : (
-            /* ☰ Menú — cuando no hay chat abierto */
             <button
               onClick={() => setSidebarOpen(true)}
               style={{
                 width: '36px', height: '36px', borderRadius: '10px',
                 border: 'none', cursor: 'pointer', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '18px'
+                background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '20px'
               }}>
               ☰
             </button>
           )}
 
-          {/* Nombre del chat activo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
             <div style={{
-              width: '24px', height: '24px', borderRadius: '6px', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px',
+              width: '26px', height: '26px', borderRadius: '6px', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px',
               background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-            }}>
-              💬
-            </div>
+            }}>💬</div>
             <span style={{
-              color: 'white', fontSize: '14px', fontWeight: 'bold',
+              color: 'white', fontSize: '15px', fontWeight: 'bold',
               fontFamily: 'Syne, sans-serif',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
             }}>
@@ -272,7 +261,6 @@ export default function Chat({ session }: Props) {
             </span>
           </div>
 
-          {/* ☰ siempre visible cuando hay chat abierto para acceder al menú */}
           {activeView && (
             <button
               onClick={() => setSidebarOpen(true)}
@@ -280,7 +268,7 @@ export default function Chat({ session }: Props) {
                 width: '36px', height: '36px', borderRadius: '10px',
                 border: 'none', cursor: 'pointer', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '18px'
+                background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '20px'
               }}>
               ☰
             </button>
@@ -288,7 +276,7 @@ export default function Chat({ session }: Props) {
         </div>
 
         {/* CONTENIDO */}
-        <div className="flex-1 overflow-hidden">
+        <div style={{ flex: 1, overflow: 'hidden' }}>
           {activeView?.type === 'group' && (
             <ChatWindow
               groupId={activeView.data.id}
@@ -314,9 +302,8 @@ export default function Chat({ session }: Props) {
               }}>
                 Selecciona un canal o usuario
               </p>
-              {/* ✅ Botón ver canales solo en móvil */}
               <button
-                className="sm:hidden"
+                className="layout-mobile-only"
                 onClick={() => setSidebarOpen(true)}
                 style={{
                   marginTop: '16px', padding: '12px 24px', borderRadius: '12px',
