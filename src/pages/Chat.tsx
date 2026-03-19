@@ -187,9 +187,9 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* ✅ SIDEBAR DESKTOP — visible en sm: (640px+)}
+      {/* ✅ SIDEBAR DESKTOP — visible en sm: (640px+), oculto en móvil */}
       <div
-        className="hidden lg:flex flex-col flex-shrink-0"
+        className="hidden sm:flex flex-col flex-shrink-0"
         style={{ width: '260px', borderRight: '1px solid rgba(255,255,255,0.05)' }}
       >
         <SidebarContent {...sidebarProps} />
@@ -197,7 +197,7 @@ export default function Chat({ session }: Props) {
 
       {/* ✅ SIDEBAR MÓVIL — overlay, solo visible cuando sidebarOpen=true */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="sm:hidden fixed inset-0 z-50 flex">
           <div
             className="absolute inset-0"
             style={{ background: 'rgba(0,0,0,0.7)' }}
@@ -217,7 +217,7 @@ export default function Chat({ session }: Props) {
 
         {/* ✅ BARRA SUPERIOR — solo visible en móvil (oculta en sm:) */}
         <div
-          className="flex items-center gap-3 flex-shrink-0"
+          className="flex sm:hidden items-center gap-3 flex-shrink-0"
           style={{
             padding: '12px 16px',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
