@@ -30,7 +30,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
   const [uploading, setUploading] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [targetAvatar, setTargetAvatar] = useState<string | null>(targetUser.avatar_url ?? null)
+  const [_targetAvatar, setTargetAvatar] = useState<string | null>(targetUser.avatar_url ?? null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -45,9 +45,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
     const channel = supabase
       .channel(`direct_${channelId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'direct_messages'
+        event: 'INSERT', schema: 'public', table: 'direct_messages'
       }, async payload => {
         const msg = payload.new as any
         const isRelevant =
@@ -67,9 +65,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         }
       })
       .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'direct_messages'
+        event: 'UPDATE', schema: 'public', table: 'direct_messages'
       }, payload => {
         const updated = payload.new as Message
         setMessages(prev =>
@@ -77,12 +73,10 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         )
       })
       .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'profiles'
+        event: 'UPDATE', schema: 'public', table: 'profiles'
       }, payload => {
         const updated = payload.new as any
-        if (updated.id === targetUser.id) setTargetAvatar(updated.avatar_url)
+        if (updated.id === targetUser.id) setTargetAvatar(updated.avatar_url ?? null)
       })
       .subscribe()
 
@@ -143,7 +137,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
     const fetchTargetProfile = async () => {
       const { data } = await supabase
         .from('profiles').select('avatar_url').eq('id', targetUser.id).single()
-      if (data) setTargetAvatar(data.avatar_url)
+      if (data) setTargetAvatar(data.avatar_url ?? null)
     }
     fetchTargetProfile()
   }, [targetUser.id])
@@ -187,7 +181,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
     setSending(false)
   }
 
-  // ✅ NUEVO: manejo de archivos multimedia
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -257,7 +250,7 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       const parts = t.split(':')
       const fileUrl = parts.slice(2).join(':')
       return (
-        <div className="flex items-center gap-2" style={{ minWidth: '200px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
           <span>🎙️</span>
           <audio controls style={{ height: '32px', maxWidth: '180px' }}>
             <source src={fileUrl} type="audio/webm" />
@@ -273,64 +266,42 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       return isImage ? (
         <div>
           <img src={fileUrl} alt={fileName}
-            className="max-w-xs rounded-lg cursor-pointer"
+            style={{ maxWidth: '200px', borderRadius: '8px', cursor: 'pointer' }}
             onClick={() => window.open(fileUrl, '_blank')} />
-          <p className="text-xs mt-1 opacity-70">{fileName}</p>
+          <p style={{ fontSize: '11px', marginTop: '4px', opacity: 0.7 }}>{fileName}</p>
         </div>
       ) : (
         <a href={fileUrl} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-2 underline">
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'white' }}>
           📄 {fileName}
         </a>
       )
     }
-    return <p>{t}</p>
+    return <p style={{ margin: 0 }}>{t}</p>
   }
 
+  // ✅ Sin header interno — el topbar de Chat.tsx lo maneja
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-6 py-4 flex items-center justify-between"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080b12' }}>
-        <div className="flex items-center gap-3">
-          {targetAvatar ? (
-            <img src={targetAvatar} alt={targetUser.username}
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-              style={{ border: '2px solid rgba(99,102,241,0.3)' }} />
-          ) : (
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-              {targetUser.username[0].toUpperCase()}
-            </div>
-          )}
-          <div>
-            <h2 className="text-white text-sm font-semibold" style={{ fontFamily: 'Syne, sans-serif' }}>
-              {targetUser.username}
-            </h2>
-            <p className="text-xs" style={{ color: '#334155' }}>Mensaje directo</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
-          style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.15)' }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-          AES-256
-        </div>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {/* Mensajes */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {messages.map(msg => {
           const isOwn = msg.sender_id === currentUserId
           return (
-            <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-xs lg:max-w-md`}>
-                <div className={`p-3 rounded-2xl text-sm msg-bubble ${isOwn ? 'rounded-br-none' : 'rounded-bl-none'}`}
-                  style={{
-                    background: isOwn ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.06)',
-                    color: 'white'
-                  }}>
+            <div key={msg.id} style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start', maxWidth: '75%' }}>
+                <div style={{
+                  padding: '10px 14px', borderRadius: '18px', fontSize: '13px',
+                  borderBottomRightRadius: isOwn ? '4px' : '18px',
+                  borderBottomLeftRadius: isOwn ? '18px' : '4px',
+                  background: isOwn ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.06)',
+                  color: 'white'
+                }}>
                   {renderContent(msg.content)}
                 </div>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs" style={{ color: '#334155' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#334155' }}>
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <MessageStatus status={msg.status} isOwn={isOwn} />
@@ -342,65 +313,50 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      {/* ✅ Input con 📎 añadido */}
-      <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-          style={{ display: 'none' }}
-          onChange={handleFile}
-        />
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${recording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`
-          }}>
+      {/* Input */}
+      <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <input ref={fileRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx" style={{ display: 'none' }} onChange={handleFile} />
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 14px', borderRadius: '16px',
+          background: 'rgba(255,255,255,0.04)',
+          border: `1px solid ${recording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`
+        }}>
           {recording ? (
             <>
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              <span className="text-red-400 text-sm flex-1">{formatTime(recordingTime)} Grabando...</span>
-              <button onClick={stopRecording}
-                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>
-                ■
-              </button>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+              <span style={{ color: '#f87171', fontSize: '13px', flex: 1 }}>{formatTime(recordingTime)} Grabando...</span>
+              <button onClick={stopRecording} style={{
+                width: '32px', height: '32px', borderRadius: '10px', border: 'none',
+                cursor: 'pointer', background: 'rgba(239,68,68,0.2)', color: '#f87171', fontSize: '14px'
+              }}>■</button>
             </>
           ) : (
             <>
-              {/* ✅ Botón 📎 siempre visible */}
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                title="Adjuntar archivo"
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '18px', flexShrink: 0, padding: '2px',
-                  color: uploading ? '#6366f1' : '#475569'
-                }}>
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', flexShrink: 0, color: uploading ? '#6366f1' : '#475569' }}
+                title="Adjuntar archivo">
                 {uploading ? '⏳' : '📎'}
               </button>
-
               <input
-                className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-600"
+                style={{ flex: 1, background: 'transparent', border: 'none', color: 'white', fontSize: '13px', outline: 'none' }}
                 placeholder={`Mensaje a ${targetUser.username}...`}
                 value={text}
                 onChange={e => setText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
               />
               {text.trim() ? (
-                <button onClick={sendMessage} disabled={sending || !text.trim()}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-sm transition-all flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white' }}>
-                  ➤
-                </button>
+                <button onClick={sendMessage} disabled={sending} style={{
+                  width: '32px', height: '32px', borderRadius: '10px', border: 'none',
+                  cursor: 'pointer', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  color: 'white', fontSize: '14px', flexShrink: 0
+                }}>➤</button>
               ) : (
-                <button onClick={startRecording}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
-                  title="Grabar audio">
-                  🎙️
-                </button>
+                <button onClick={startRecording} style={{
+                  width: '32px', height: '32px', borderRadius: '10px', border: 'none',
+                  cursor: 'pointer', background: 'rgba(99,102,241,0.15)', color: '#818cf8',
+                  fontSize: '16px', flexShrink: 0
+                }} title="Grabar audio">🎙️</button>
               )}
             </>
           )}

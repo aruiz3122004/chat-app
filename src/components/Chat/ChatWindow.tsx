@@ -16,7 +16,7 @@ interface Message {
 
 interface Props { groupId: string; groupName?: string; currentUserId: string }
 
-export default function ChatWindow({ groupId, groupName, currentUserId }: Props) {
+export default function ChatWindow({ groupId, groupName: _groupName, currentUserId }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
