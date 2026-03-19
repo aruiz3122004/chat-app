@@ -13,33 +13,45 @@ interface Group { id: string; name: string }
 interface Profile { id: string; username: string; avatar_url?: string | null }
 type ActiveView = { type: 'group'; data: Group } | { type: 'direct'; data: Profile } | null
 
-interface SidebarProps {
-  avatar: string | null
-  username: string
-  email: string
-  userId: string
-  activeView: ActiveView
-  onEditProfile: () => void
-  onSelectGroup: (g: Group) => void
-  onSelectUser: (u: Profile) => void
-  onStartChat: (u: Profile) => void
-  onLogout: () => void
-  onCloseSidebar: () => void
-}
+export default function Chat({ session }: Props) {
+  const [activeView, setActiveView] = useState<ActiveView>(null)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [username, setUsername] = useState('')
+  const [avatar, setAvatar] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-function SidebarContent({
-  avatar, username, email, userId, activeView,
-  onEditProfile, onSelectGroup, onSelectUser,
-  onStartChat, onLogout, onCloseSidebar
-}: SidebarProps) {
-  return (
+  useEffect(() => {
+    if (Notification.permission === 'default') Notification.requestPermission()
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('username, avatar_url')
+      .eq('id', session.user.id)
+      .single()
+    if (data) {
+      setUsername(data.username)
+      setAvatar(data.avatar_url)
+    }
+  }
+
+  const handleLogout = async () => { await supabase.auth.signOut() }
+
+  const handleSelectView = (view: ActiveView) => {
+    setActiveView(view)
+    setSidebarOpen(false)
+  }
+
+  const SidebarContent = () => (
     <div style={{
       display: 'flex', flexDirection: 'column',
       height: '100%', width: '100%',
       padding: '20px 12px', background: '#0a0e17'
     }}>
       <button
-        onClick={() => { onEditProfile(); onCloseSidebar() }}
+        onClick={() => { setShowEditProfile(true); setSidebarOpen(false) }}
         style={{
           padding: '8px', marginBottom: '16px', textAlign: 'left',
           width: '100%', borderRadius: '12px', background: 'transparent',
@@ -75,20 +87,23 @@ function SidebarContent({
           fontSize: '12px', color: '#334155', paddingLeft: '36px', margin: 0,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }}>
-          {email}
+          {session.user.email}
         </p>
       </button>
 
       <div style={{ marginBottom: '16px' }}>
-        <UserSearch currentUserId={userId} onStartChat={onStartChat} />
+        <UserSearch
+          currentUserId={session.user.id}
+          onStartChat={u => handleSelectView({ type: 'direct', data: u })}
+        />
       </div>
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
 
       <div style={{ marginBottom: '16px' }}>
         <GroupList
-          userId={userId}
-          onSelectGroup={onSelectGroup}
+          userId={session.user.id}
+          onSelectGroup={g => handleSelectView({ type: 'group', data: g })}
           selectedGroupId={activeView?.type === 'group' ? activeView.data.id : null}
         />
       </div>
@@ -97,15 +112,15 @@ function SidebarContent({
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <UserList
-          currentUserId={userId}
-          onSelectUser={onSelectUser}
+          currentUserId={session.user.id}
+          onSelectUser={u => handleSelectView({ type: 'direct', data: u })}
           selectedUserId={activeView?.type === 'direct' ? activeView.data.id : null}
         />
       </div>
 
       <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           style={{
             width: '100%', padding: '8px 12px', borderRadius: '12px',
             fontSize: '12px', fontWeight: '500', border: 'none', cursor: 'pointer',
@@ -125,60 +140,12 @@ function SidebarContent({
       </div>
     </div>
   )
-}
-
-export default function Chat({ session }: Props) {
-  const [activeView, setActiveView] = useState<ActiveView>(null)
-  const [showEditProfile, setShowEditProfile] = useState(false)
-  const [username, setUsername] = useState('')
-  const [avatar, setAvatar] = useState<string | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  useEffect(() => {
-    if (Notification.permission === 'default') Notification.requestPermission()
-    fetchProfile()
-  }, [])
-
-  const fetchProfile = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', session.user.id)
-      .single()
-    if (data) {
-      setUsername(data.username)
-      setAvatar(data.avatar_url)
-    }
-  }
-
-  const handleLogout = async () => { await supabase.auth.signOut() }
-
-  const handleSelectView = (view: ActiveView) => {
-    setActiveView(view)
-    setSidebarOpen(false)
-  }
-
-  const sidebarProps: SidebarProps = {
-    avatar,
-    username,
-    email: session.user.email ?? '',
-    userId: session.user.id,
-    activeView,
-    onEditProfile: () => setShowEditProfile(true),
-    onSelectGroup: g => handleSelectView({ type: 'group', data: g }),
-    onSelectUser: u => handleSelectView({ type: 'direct', data: u }),
-    onStartChat: u => handleSelectView({ type: 'direct', data: u }),
-    onLogout: handleLogout,
-    onCloseSidebar: () => setSidebarOpen(false)
-  }
 
   return (
     <div style={{
       display: 'flex',
-      height: '100vh',
-      width: '100vw',
-      overflow: 'hidden',
-      background: '#080b12'
+      height: '100vh', width: '100vw',
+      overflow: 'hidden', background: '#080b12'
     }}>
       {showEditProfile && (
         <EditProfile
@@ -190,7 +157,7 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* SIDEBAR — siempre overlay en TODOS los dispositivos */}
+      {/* SIDEBAR overlay */}
       {sidebarOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex' }}>
           <div
@@ -203,120 +170,49 @@ export default function Chat({ session }: Props) {
             display: 'flex', flexDirection: 'column',
             borderRight: '1px solid rgba(255,255,255,0.08)'
           }}>
-            <SidebarContent {...sidebarProps} />
+            <SidebarContent />
           </div>
         </div>
       )}
 
-      {/* ÁREA PRINCIPAL */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* TOPBAR — siempre visible en TODOS los dispositivos sin excepción */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '12px 16px',
-          flexShrink: 0,
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          background: '#0a0e17'
-        }}>
-          {activeView ? (
-            <button
-              onClick={() => setActiveView(null)}
-              style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                border: 'none', cursor: 'pointer', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(99,102,241,0.2)', color: '#818cf8', fontSize: '20px'
-              }}>
-              ←
-            </button>
-          ) : (
+      {/* CONTENIDO PRINCIPAL */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {activeView?.type === 'group' && (
+          <ChatWindow
+            groupId={activeView.data.id}
+            groupName={activeView.data.name}
+            currentUserId={session.user.id}
+          />
+        )}
+        {activeView?.type === 'direct' && (
+          <DirectChatWindow
+            currentUserId={session.user.id}
+            targetUser={activeView.data}
+          />
+        )}
+        {!activeView && (
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', height: '100%'
+          }}>
+            <div style={{ fontSize: '60px', marginBottom: '16px', opacity: 0.1 }}>💬</div>
+            <p style={{
+              fontSize: '16px', fontWeight: '600', textAlign: 'center',
+              padding: '0 16px', fontFamily: 'Syne, sans-serif', color: '#1e293b'
+            }}>
+              Selecciona un canal o usuario
+            </p>
             <button
               onClick={() => setSidebarOpen(true)}
               style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                border: 'none', cursor: 'pointer', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '20px'
+                marginTop: '16px', padding: '12px 24px', borderRadius: '12px',
+                fontSize: '14px', fontWeight: '500', border: 'none', cursor: 'pointer',
+                background: 'rgba(99,102,241,0.15)', color: '#818cf8'
               }}>
-              ☰
+              Ver canales y usuarios
             </button>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-            <div style={{
-              width: '26px', height: '26px', borderRadius: '6px', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-            }}>💬</div>
-            <span style={{
-              color: 'white', fontSize: '15px', fontWeight: 'bold',
-              fontFamily: 'Syne, sans-serif',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-            }}>
-              {activeView?.type === 'group'
-                ? `# ${activeView.data.name}`
-                : activeView?.type === 'direct'
-                ? activeView.data.username
-                : 'ChatApp'}
-            </span>
           </div>
-
-          {activeView && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                border: 'none', cursor: 'pointer', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '20px'
-              }}>
-              ☰
-            </button>
-          )}
-        </div>
-
-        {/* CONTENIDO */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          {activeView?.type === 'group' && (
-            <ChatWindow
-              groupId={activeView.data.id}
-              groupName={activeView.data.name}
-              currentUserId={session.user.id}
-            />
-          )}
-          {activeView?.type === 'direct' && (
-            <DirectChatWindow
-              currentUserId={session.user.id}
-              targetUser={activeView.data}
-            />
-          )}
-          {!activeView && (
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', height: '100%'
-            }}>
-              <div style={{ fontSize: '60px', marginBottom: '16px', opacity: 0.1 }}>💬</div>
-              <p style={{
-                fontSize: '16px', fontWeight: '600', textAlign: 'center',
-                padding: '0 16px', fontFamily: 'Syne, sans-serif', color: '#1e293b'
-              }}>
-                Selecciona un canal o usuario
-              </p>
-              <button
-                onClick={() => setSidebarOpen(true)}
-                style={{
-                  marginTop: '16px', padding: '12px 24px', borderRadius: '12px',
-                  fontSize: '14px', fontWeight: '500', border: 'none', cursor: 'pointer',
-                  background: 'rgba(99,102,241,0.15)', color: '#818cf8'
-                }}>
-                Ver canales y usuarios
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   )
