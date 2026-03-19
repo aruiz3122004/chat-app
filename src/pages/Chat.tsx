@@ -13,47 +13,35 @@ interface Group { id: string; name: string }
 interface Profile { id: string; username: string; avatar_url?: string | null }
 type ActiveView = { type: 'group'; data: Group } | { type: 'direct'; data: Profile } | null
 
-export default function Chat({ session }: Props) {
-  const [activeView, setActiveView] = useState<ActiveView>(null)
-  const [showEditProfile, setShowEditProfile] = useState(false)
-  const [username, setUsername] = useState('')
-  const [avatar, setAvatar] = useState<string | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+// ✅ CLAVE: SidebarContent FUERA de Chat para evitar remonte en cada render
+interface SidebarProps {
+  avatar: string | null
+  username: string
+  email: string
+  userId: string
+  activeView: ActiveView
+  onEditProfile: () => void
+  onSelectGroup: (g: Group) => void
+  onSelectUser: (u: Profile) => void
+  onStartChat: (u: Profile) => void
+  onLogout: () => void
+  onCloseSidebar: () => void
+}
 
-  useEffect(() => {
-    if (Notification.permission === 'default') Notification.requestPermission()
-    fetchProfile()
-  }, [])
-
-  const fetchProfile = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', session.user.id)
-      .single()
-    if (data) {
-      setUsername(data.username)
-      setAvatar(data.avatar_url)
-    }
-  }
-
-  const handleLogout = async () => { await supabase.auth.signOut() }
-
-  const handleSelectView = (view: ActiveView) => {
-    setActiveView(view)
-    setSidebarOpen(false)
-  }
-
-  const SidebarContent = () => (
+function SidebarContent({
+  avatar, username, email, userId, activeView,
+  onEditProfile, onSelectGroup, onSelectUser,
+  onStartChat, onLogout, onCloseSidebar
+}: SidebarProps) {
+  return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       height: '100%', width: '100%',
-      padding: '20px 12px',
-      background: '#0a0e17'
+      padding: '20px 12px', background: '#0a0e17'
     }}>
       {/* Perfil */}
       <button
-        onClick={() => { setShowEditProfile(true); setSidebarOpen(false) }}
+        onClick={() => { onEditProfile(); onCloseSidebar() }}
         style={{
           padding: '8px', marginBottom: '16px', textAlign: 'left',
           width: '100%', borderRadius: '12px', background: 'transparent',
@@ -89,16 +77,13 @@ export default function Chat({ session }: Props) {
           fontSize: '12px', color: '#334155', paddingLeft: '36px', margin: 0,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }}>
-          {session.user.email}
+          {email}
         </p>
       </button>
 
       {/* Búsqueda */}
       <div style={{ marginBottom: '16px' }}>
-        <UserSearch
-          currentUserId={session.user.id}
-          onStartChat={u => handleSelectView({ type: 'direct', data: u })}
-        />
+        <UserSearch currentUserId={userId} onStartChat={onStartChat} />
       </div>
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }} />
@@ -106,8 +91,8 @@ export default function Chat({ session }: Props) {
       {/* Grupos */}
       <div style={{ marginBottom: '16px' }}>
         <GroupList
-          userId={session.user.id}
-          onSelectGroup={g => handleSelectView({ type: 'group', data: g })}
+          userId={userId}
+          onSelectGroup={onSelectGroup}
           selectedGroupId={activeView?.type === 'group' ? activeView.data.id : null}
         />
       </div>
@@ -117,8 +102,8 @@ export default function Chat({ session }: Props) {
       {/* Usuarios */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <UserList
-          currentUserId={session.user.id}
-          onSelectUser={u => handleSelectView({ type: 'direct', data: u })}
+          currentUserId={userId}
+          onSelectUser={onSelectUser}
           selectedUserId={activeView?.type === 'direct' ? activeView.data.id : null}
         />
       </div>
@@ -126,7 +111,7 @@ export default function Chat({ session }: Props) {
       {/* Cerrar sesión */}
       <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           style={{
             width: '100%', padding: '8px 12px', borderRadius: '12px',
             fontSize: '12px', fontWeight: '500', border: 'none', cursor: 'pointer',
@@ -146,6 +131,38 @@ export default function Chat({ session }: Props) {
       </div>
     </div>
   )
+}
+
+export default function Chat({ session }: Props) {
+  const [activeView, setActiveView] = useState<ActiveView>(null)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [username, setUsername] = useState('')
+  const [avatar, setAvatar] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    if (Notification.permission === 'default') Notification.requestPermission()
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('username, avatar_url')
+      .eq('id', session.user.id)
+      .single()
+    if (data) {
+      setUsername(data.username)
+      setAvatar(data.avatar_url)
+    }
+  }
+
+  const handleLogout = async () => { await supabase.auth.signOut() }
+
+  const handleSelectView = (view: ActiveView) => {
+    setActiveView(view)
+    setSidebarOpen(false)
+  }
 
   return (
     <div style={{
@@ -164,7 +181,7 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* SIDEBAR — siempre overlay en todos los dispositivos */}
+      {/* SIDEBAR — siempre overlay */}
       {sidebarOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex' }}>
           <div
@@ -177,12 +194,24 @@ export default function Chat({ session }: Props) {
             display: 'flex', flexDirection: 'column',
             borderRight: '1px solid rgba(255,255,255,0.08)'
           }}>
-            <SidebarContent />
+            <SidebarContent
+              avatar={avatar}
+              username={username}
+              email={session.user.email ?? ''}
+              userId={session.user.id}
+              activeView={activeView}
+              onEditProfile={() => setShowEditProfile(true)}
+              onSelectGroup={g => handleSelectView({ type: 'group', data: g })}
+              onSelectUser={u => handleSelectView({ type: 'direct', data: u })}
+              onStartChat={u => handleSelectView({ type: 'direct', data: u })}
+              onLogout={handleLogout}
+              onCloseSidebar={() => setSidebarOpen(false)}
+            />
           </div>
         </div>
       )}
 
-      {/* BARRA SUPERIOR — siempre visible en todos los dispositivos */}
+      {/* BARRA SUPERIOR — siempre visible */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '12px',
         padding: '12px 16px', flexShrink: 0,
@@ -196,7 +225,7 @@ export default function Chat({ session }: Props) {
               width: '32px', height: '32px', borderRadius: '8px',
               border: 'none', cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontSize: '16px'
+              background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontSize: '18px'
             }}>
             ←
           </button>
@@ -207,7 +236,7 @@ export default function Chat({ session }: Props) {
               width: '32px', height: '32px', borderRadius: '8px',
               border: 'none', cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '16px'
+              background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '18px'
             }}>
             ☰
           </button>
@@ -234,6 +263,7 @@ export default function Chat({ session }: Props) {
           </span>
         </div>
 
+        {/* ☰ siempre visible cuando hay chat abierto */}
         {activeView && (
           <button
             onClick={() => setSidebarOpen(true)}
@@ -241,7 +271,7 @@ export default function Chat({ session }: Props) {
               width: '32px', height: '32px', borderRadius: '8px',
               border: 'none', cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '16px'
+              background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '18px'
             }}>
             ☰
           </button>

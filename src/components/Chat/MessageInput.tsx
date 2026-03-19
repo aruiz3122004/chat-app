@@ -48,23 +48,27 @@ export default function MessageInput({ groupId, senderId }: Props) {
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
-
       mediaRecorder.ondataavailable = e => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
-
       mediaRecorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        await uploadAudio(blob)
+        const fileName = `audio_${Date.now()}.webm`
+        const file = new File([blob], fileName, { type: 'audio/webm' })
+        setUploading(true)
+        const { data, error } = await supabase.storage
+          .from('chat-files').upload(`${groupId}/${fileName}`, file)
+        if (!error && data) {
+          const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(data.path)
+          await sendMessage(`AUDIO:${fileName}:${urlData.publicUrl}`, true)
+        }
+        setUploading(false)
         stream.getTracks().forEach(t => t.stop())
       }
-
       mediaRecorder.start()
       setRecording(true)
       setRecordingTime(0)
-      timerRef.current = setInterval(() => {
-        setRecordingTime(t => t + 1)
-      }, 1000)
+      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000)
     } catch {
       alert('No se pudo acceder al micrófono')
     }
@@ -77,66 +81,100 @@ export default function MessageInput({ groupId, senderId }: Props) {
     setRecordingTime(0)
   }
 
-  const uploadAudio = async (blob: Blob) => {
-    setUploading(true)
-    const fileName = `audio_${Date.now()}.webm`
-    const file = new File([blob], fileName, { type: 'audio/webm' })
-    const { data, error } = await supabase.storage
-      .from('chat-files').upload(`${groupId}/${fileName}`, file)
-    if (!error && data) {
-      const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(data.path)
-      await sendMessage(`AUDIO:${fileName}:${urlData.publicUrl}`, true)
-    }
-    setUploading(false)
-  }
-
-  const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
   return (
-    <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${recording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}` }}>
-        
-        <input ref={fileRef} type="file" className="hidden" onChange={handleFile} />
-        
+    <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+        style={{ display: 'none' }}
+        onChange={handleFile}
+      />
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        padding: '10px 14px', borderRadius: '16px',
+        background: 'rgba(255,255,255,0.04)',
+        border: `1px solid ${recording ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`
+      }}>
         {recording ? (
+          /* Estado grabando */
           <>
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-            <span className="text-red-400 text-sm flex-1">{formatTime(recordingTime)} Grabando...</span>
-            <button onClick={stopRecording}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0"
-              style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>
+            <span style={{
+              width: '8px', height: '8px', borderRadius: '50%',
+              background: '#ef4444', flexShrink: 0, animation: 'pulse 1s infinite'
+            }} />
+            <span style={{ color: '#f87171', fontSize: '13px', flex: 1 }}>
+              {formatTime(recordingTime)} Grabando...
+            </span>
+            <button
+              onClick={stopRecording}
+              style={{
+                width: '32px', height: '32px', borderRadius: '10px',
+                border: 'none', cursor: 'pointer', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(239,68,68,0.2)', color: '#f87171', fontSize: '14px'
+              }}>
               ■
             </button>
           </>
         ) : (
+          /* Estado normal — 📎 y 🎙️ siempre visibles */
           <>
-            <button onClick={() => fileRef.current?.click()} disabled={uploading}
-              className="text-lg transition-all flex-shrink-0"
-              style={{ color: uploading ? '#6366f1' : '#334155' }}
-              title="Adjuntar archivo">
+            {/* 📎 Adjuntar archivo — siempre visible */}
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              title="Adjuntar archivo o imagen"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: '18px', flexShrink: 0, padding: '2px',
+                color: uploading ? '#6366f1' : '#475569',
+                opacity: uploading ? 0.7 : 1
+              }}>
               {uploading ? '⏳' : '📎'}
             </button>
 
+            {/* Input de texto */}
             <input
-              className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-600"
+              style={{
+                flex: 1, background: 'transparent', border: 'none',
+                color: 'white', fontSize: '13px', outline: 'none'
+              }}
               placeholder="Escribe un mensaje..."
               value={text}
               onChange={e => setText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(text)}
             />
 
+            {/* 🎙️ Audio — siempre visible cuando no hay texto */}
+            {/* ➤ Enviar — visible cuando hay texto */}
             {text.trim() ? (
-              <button onClick={() => sendMessage(text)} disabled={sending}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-sm transition-all flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white' }}>
+              <button
+                onClick={() => sendMessage(text)}
+                disabled={sending}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '10px',
+                  border: 'none', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  color: 'white', fontSize: '14px'
+                }}>
                 ➤
               </button>
             ) : (
-              <button onClick={startRecording}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-sm transition-all flex-shrink-0"
-                style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
-                title="Grabar audio">
+              <button
+                onClick={startRecording}
+                title="Grabar audio"
+                style={{
+                  width: '32px', height: '32px', borderRadius: '10px',
+                  border: 'none', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontSize: '16px'
+                }}>
                 🎙️
               </button>
             )}
