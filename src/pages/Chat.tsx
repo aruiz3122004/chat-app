@@ -190,12 +190,7 @@ export default function Chat({ session }: Props) {
         />
       )}
 
-      {/* SIDEBAR DESKTOP — controlada por CSS puro en index.css */}
-      <div className="layout-sidebar">
-        <SidebarContent {...sidebarProps} />
-      </div>
-
-      {/* SIDEBAR OVERLAY — para móvil cuando se abre con ☰ */}
+      {/* SIDEBAR — siempre overlay en TODOS los dispositivos */}
       {sidebarOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex' }}>
           <div
@@ -216,8 +211,16 @@ export default function Chat({ session }: Props) {
       {/* ÁREA PRINCIPAL */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* BARRA SUPERIOR — controlada por CSS puro en index.css */}
-        <div className="layout-topbar">
+        {/* TOPBAR — siempre visible en TODOS los dispositivos sin excepción */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 16px',
+          flexShrink: 0,
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          background: '#0a0e17'
+        }}>
           {activeView ? (
             <button
               onClick={() => setActiveView(null)}
@@ -303,7 +306,6 @@ export default function Chat({ session }: Props) {
                 Selecciona un canal o usuario
               </p>
               <button
-                className="layout-mobile-only"
                 onClick={() => setSidebarOpen(true)}
                 style={{
                   marginTop: '16px', padding: '12px 24px', borderRadius: '12px',
