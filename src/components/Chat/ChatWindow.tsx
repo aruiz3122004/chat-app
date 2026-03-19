@@ -14,7 +14,7 @@ interface Message {
   profiles?: { username: string }
 }
 
-interface Props { groupId: string; groupName?: string; currentUserId: string }
+interface Props { groupId: string; groupName: string; currentUserId: string }
 
 export default function ChatWindow({ groupId, groupName, currentUserId }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -45,6 +45,7 @@ export default function ChatWindow({ groupId, groupName, currentUserId }: Props)
       })
       .subscribe()
 
+    // Polling de respaldo cada 3 segundos
     pollRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('messages')
@@ -61,6 +62,7 @@ export default function ChatWindow({ groupId, groupName, currentUserId }: Props)
       }
     }, 3000)
 
+    // Reconectar al volver a la app
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         supabase.realtime.connect()
@@ -92,9 +94,29 @@ export default function ChatWindow({ groupId, groupName, currentUserId }: Props)
     if (data) setMessages(data)
   }
 
-  // ✅ Sin header interno — el topbar de Chat.tsx lo maneja
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
+      <div className="px-6 py-4 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080b12' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+            style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontFamily: 'Syne, sans-serif' }}>
+            #
+          </div>
+          <div>
+            <h2 className="text-white text-sm font-semibold" style={{ fontFamily: 'Syne, sans-serif' }}>
+              {groupName}
+            </h2>
+            <p className="text-xs" style={{ color: '#334155' }}>Canal de mensajes</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
+          style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.15)' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+          AES-256
+        </div>
+      </div>
+
       <MessageList messages={messages} currentUserId={currentUserId} />
       <MessageInput groupId={groupId} senderId={currentUserId} />
     </div>
