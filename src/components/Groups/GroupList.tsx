@@ -27,21 +27,36 @@ export default function GroupList({ userId, onSelectGroup, selectedGroupId }: Pr
     }
   }
 
-  const createGroup = async () => {
-    if (!newGroupName.trim() || creating) return
-    setCreating(true)
-    const { data, error } = await supabase
-      .from('groups')
-      .insert({ name: newGroupName.trim(), created_by: userId })
-      .select().single()
-    if (!error && data) {
-      await supabase.from('group_members').insert({ group_id: data.id, user_id: userId })
+const createGroup = async () => {
+  if (!newGroupName.trim() || creating) return
+  setCreating(true)
+
+  const { data, error } = await supabase
+    .from('groups')
+    .insert({ name: newGroupName.trim(), created_by: userId })
+    .select().single()
+
+  if (error) {
+    alert('Error grupos: ' + error.message + ' | code: ' + error.code)
+    setCreating(false)
+    return
+  }
+
+  if (data) {
+    const { error: memberError } = await supabase
+      .from('group_members')
+      .insert({ group_id: data.id, user_id: userId })
+
+    if (memberError) {
+      alert('Error miembros: ' + memberError.message + ' | code: ' + memberError.code)
+    } else {
       setGroups(prev => [...prev, data])
       setNewGroupName('')
       setShowInput(false)
     }
-    setCreating(false)
   }
+  setCreating(false)
+}
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
