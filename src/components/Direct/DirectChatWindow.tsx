@@ -27,10 +27,12 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [targetAvatar, setTargetAvatar] = useState<string | null>(targetUser.avatar_url ?? null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -84,7 +86,6 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
       })
       .subscribe()
 
-    // Polling de respaldo cada 3 segundos
     pollRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('direct_messages')
@@ -184,6 +185,28 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
     })
     setText('')
     setSending(false)
+  }
+
+  // ✅ NUEVO: manejo de archivos multimedia
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const fileName = `${Date.now()}_${file.name}`
+    const { data, error } = await supabase.storage
+      .from('chat-files').upload(`direct/${fileName}`, file)
+    if (!error && data) {
+      const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(data.path)
+      await supabase.from('direct_messages').insert({
+        content: encryptMessage(`FILE:${file.name}:${urlData.publicUrl}`),
+        sender_id: currentUserId,
+        receiver_id: targetUser.id,
+        is_encrypted: true,
+        status: 'sent'
+      })
+    }
+    setUploading(false)
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   const startRecording = async () => {
@@ -319,7 +342,15 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
         <div ref={bottomRef} />
       </div>
 
+      {/* ✅ Input con 📎 añadido */}
       <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+          style={{ display: 'none' }}
+          onChange={handleFile}
+        />
         <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
           style={{
             background: 'rgba(255,255,255,0.04)',
@@ -337,6 +368,19 @@ export default function DirectChatWindow({ currentUserId, targetUser }: Props) {
             </>
           ) : (
             <>
+              {/* ✅ Botón 📎 siempre visible */}
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                title="Adjuntar archivo"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '18px', flexShrink: 0, padding: '2px',
+                  color: uploading ? '#6366f1' : '#475569'
+                }}>
+                {uploading ? '⏳' : '📎'}
+              </button>
+
               <input
                 className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-600"
                 placeholder={`Mensaje a ${targetUser.username}...`}
